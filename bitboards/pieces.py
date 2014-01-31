@@ -56,3 +56,5 @@ def B_attacks(occ, sq):
 
 def Q_attacks(occ, sq):
     return R_attacks(occ, sq) | B_attacks(occ, sq)
+
+attacks = (None, K_attacks, N_attacks, B_attacks, R_attacks, Q_attacks)

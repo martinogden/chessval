@@ -32,3 +32,7 @@ def bP_spushes(bpawns, empty):
 def bP_dpushes(bpawns, empty):
     empty_A6H6 = (empty & A5H5) << 8 & empty
     return bP_spushes(bpawns, empty_A6H6)
+
+P_attacks = (wP_attacks, bP_attacks)
+P_spushes = (wP_spushes, bP_spushes)
+P_dpushes = (wP_dpushes, bP_dpushes)

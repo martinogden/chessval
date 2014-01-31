@@ -1,15 +1,32 @@
-#!/usr/bin/env python
+import logging
+from collections import deque
 
 from constants import *
-import inout as io
+from serialization import Serializer
 import bitboards as bb
+import move
+
+logging.basicConfig(**{
+    'format': "[%(levelname)s] %(message)s",
+    'filename': "xboard.log",
+    'filemode': 'w',
+    'level': logging.DEBUG,
+})
+
+
+OFFSET = 14
+MAX_MOVES = 100
 
 
 class InvalidMove(ValueError):
     pass
 
 
-class Board(object):
+class KingInCheck(ValueError):
+    pass
+
+
+class Board(Serializer):
 
     player = WHITE
     ep = None
@@ -22,23 +39,19 @@ class Board(object):
     # [14-16] aggregated bitboards: w / b / all
     positions = [0x0L] * 17
     occupancy = [-1] * 64
+    moves = deque()
+    king = [-1, -1]
 
-    def __init__(self, fen=None):
-        super(Board, self).__init__()
-        self.reset()
+    def piece_bb(self, piece):
+        return self.positions[piece]
 
-    def __unicode__(self):
-        return io.unicode(self)
+    def piece_at(self, i):
+        return self.occupancy[i]
 
     def reset(self, fen=INITIAL_FEN):
-        self.player = WHITE
-        self.en_passant = None
-        self.castling = 0x00
-        self.half_moves = 0
-        self.full_moves = 1
         self.positions = [0x0L] * 17
         self.occupancy = [-1] * 64
-        io.from_fen(self, fen or INITIAL_FEN)
+        self.setboard(fen)
 
     def is_legal(self, frm, to, promotion=None):
         """ Check if move frm sq `frm` to square `to` is legal
@@ -46,11 +59,48 @@ class Board(object):
             :todo: add castling moves
             :todo: add promotion moves
         """
+        ply = len(self.moves)
+        try:
+            self.makemove(frm, to, promotion)
+        except (InvalidMove, KingInCheck), e:
+            return False
+        else:
+            self.unmakemove()
+            return True
 
-        offset = 14
+    def is_attacked(self, sq, by):
+        pos = self.positions
+        occ = pos[-1]
+        by_offset = by<<3
 
-        occ = self.positions[offset + ALL]
-        friendly = self.positions[offset + self.player]
+        P = pos[WHITE_PAWN | by_offset]
+        if bb.P_attacks[by^1](P, sq): logging.debug("check P"); return True
+        N = pos[WHITE_KNIGHT | by_offset]
+        if bb.N_attacks(occ, sq) & N:
+            logging.debug("check N")
+            logging.debug(pos)
+            logging.debug(WHITE_KNIGHT)
+            logging.debug(by_offset)
+            logging.debug(bb.N_attacks(occ, sq))
+            logging.debug(N)
+            return True
+        K = pos[WHITE_KING | by_offset]
+        if bb.K_attacks(occ, sq) & K: logging.debug("check K | sq:%i by:%i", sq, by); return True
+        B = pos[WHITE_BISHOP | by_offset] | pos[WHITE_QUEEN | by_offset]
+        if bb.B_attacks(occ, sq) & B: logging.debug("check B"); return True
+        R = pos[WHITE_BISHOP | by_offset] | pos[WHITE_QUEEN | by_offset]
+        if bb.R_attacks(occ, sq) & R: logging.debug("check R"); return True
+
+        return False
+
+    def makemove(self, frm, to, promotion=None):
+        """ Make a (legal) move 
+            :todo: add castling moves
+            :todo: add promotion moves
+        """
+
+        occ = self.positions[-1]
+        friendly = self.positions[OFFSET + self.player]
         piece = self.occupancy[frm]
 
         if piece == -1:
@@ -58,62 +108,48 @@ class Board(object):
 
         # pawns are a special case
         if piece % 8 == WHITE_PAWN:
-            sp_map = (bb.wP_spushes, bb.bP_spushes)
-            dp_map = (bb.wP_dpushes, bb.bP_dpushes)
-            pa_map = (bb.wP_attacks, bb.bP_attacks)
-
             delta = to - frm
             my_pawns = self.positions[piece]
             empty = occ ^ bb.masks.FULL
 
-            # if frm and to are congruent modulo 16, this is a dbl pawn push.
-            if delta % 16 == 0:  # double push
-                p_pawns = dp_map[self.player](my_pawns, empty)
+            # if delta is congruent modulo. 8, this is pawn push
+            if delta and delta % 8 == 0:  
+                if delta % 16 == 0:  # double push
+                    p_pawns = bb.P_dpushes[self.player](my_pawns, empty)
+                else:  # single push
+                    p_pawns = bb.P_spushes[self.player](my_pawns, empty)
 
                 if p_pawns & (1<<frm) == 0L:
                     raise InvalidMove("Pawn not able to push")
 
-            # or if cong. mod. 8 it is a single push
-            elif delta % 8 == 0:  # single push
-                p_pawns = sp_map[self.player](my_pawns, empty)
+                if (delta < 0 and self.player == WHITE) or\
+                        (delta > 0 and self.player == BLACK):
+                    raise InvalidMove("Pawns cannot push backwards")
 
-                if p_pawns & (1<<frm) == 0L:
-                    raise ValueError("Pawn not able to push")
-            else:                
-                # check for pawn attacks
-                enemy = self.positions[offset + (self.player ^ 1)]
+            else:  # check for pawn attacks
+                enemy = self.positions[OFFSET + (self.player ^ 1)]
 
                 # treat en passant square as an enemy piece
                 if self.ep:
                     enemy |= (1<<self.ep)
 
-                targets = pa_map[self.player](enemy, frm)
+                targets = bb.P_attacks[self.player](enemy, frm)
 
                 if targets & (1<<to) == 0L:
-                    raise ValueError("Pawn unable to attack")
+                    raise InvalidMove("Pawn unable to attack")
 
             # TODO en passant and promotion moves
         else:
             # all other pieces can be dealt with generically
-            a_map = (
-                None, bb.K_attacks, bb.N_attacks,
-                bb.B_attacks, bb.R_attacks, bb.Q_attacks
-            )
-            attacks = a_map[piece % 8](occ, frm)
+            attacks = bb.attacks[piece % 8](occ, frm)
             targets = attacks & (bb.masks.FULL ^ friendly)
             if targets & (1<<to) == 0L:
-                raise ValueError("Invalid slider target sq")
+                raise InvalidMove("Invalid slider target sq")
             # TODO castling moves
 
 
-    def makemove(self, frm, to, promotion=None):
-        """ Make a (legal) move 
-            :todo: add castling moves
-            :todo: add promotion moves
-        """
-        # this will throw if move not valid
-        self.is_legal(frm, to, promotion=promotion)
-
+        #################
+        ##### Make move #
         piece = self.occupancy[frm]
         frm_sq = 1 << frm
         to_sq = 1 << to
@@ -122,31 +158,38 @@ class Board(object):
         self.occupancy[frm] = -1
         not_frm_sq = bb.masks.FULL ^ frm_sq
         self.positions[piece] &= not_frm_sq
-        self.positions[offset + self.player] &= not_frm_sq
-        self.positions[offset + ALL] &= not_frm_sq
+        self.positions[OFFSET + self.player] &= not_frm_sq
+        self.positions[-1] &= not_frm_sq
 
         # handle capture
         cpiece = self.occupancy[to]
         if cpiece > -1:
             self.positions[cpiece] &= bb.masks.FULL ^ to_sq
-
+            self.positions[OFFSET + (self.player^1)] &= bb.masks.FULL ^ to_sq
 
         ### drop pieces
         self.occupancy[to] = piece
         self.positions[piece] |= to_sq
-        self.positions[offset + self.player] |= to_sq
-        self.positions[offset + ALL] |= to_sq
+        self.positions[OFFSET + self.player] |= to_sq
+        self.positions[-1] |= to_sq
+        # update king position (for check detection)
+        if piece % 8 == WHITE_KING:
+            self.king[self.player] = to
 
         ### store pieces TODO
         ### retreive pieces TODO
 
         ### update game status
-        self.half_moves += 1
-        self.full_moves + self.half_moves % 2
+        if cpiece > -1 or piece % 8 == WHITE_PAWN:
+            self.half_moves = 0
+        else:
+            self.half_moves += 1
+
+        self.full_moves += self.player  # update on black
         self.player ^= 1
 
         # set or reset en passant square
-        if piece % 16 == WHITE_PAWN:
+        if piece % 8 == WHITE_PAWN:
             # if frm and to are congruent modulo 16, this is a dbl pawn push.
             delta = to - frm
             if delta % 16 == 0:
@@ -154,23 +197,49 @@ class Board(object):
         else:
             self.ep = None
 
+        self.moves.append(move.new(frm, to, cpiece))
+        if self.is_attacked(self.king[self.player^1], self.player):
+            self.unmakemove()
+            raise KingInCheck()
 
-if __name__ == "__main__":
-    from sys import stdout
-    b = Board()
+    def unmakemove(self):
+        mv = self.moves.pop()
+        logging.debug("unmakemove: %s", mv)
+        frm, to, cpiece, flags = mv
 
-    while(True):
-        stdout.write(unicode(b))
-        player = ["W", "B"][b.player]
-        mv = raw_input("%s to move: \033[K" % player)
-        try:
-            frm = io.to_bit(mv[:2])
-            to = io.to_bit(mv[2:5])
-            b.makemove(frm, to)
-        except Exception, e:
-            stdout.write("\033[F" * 10)
-            stdout.write(" " * 20)
-            stdout.write(str(e) + "\n" + "\033[K")
-            stdout.write("\033[F")
-        else:
-            stdout.write("\033[F" * 10)
+        piece = self.occupancy[to]
+        frm_sq = 1 << frm
+        to_sq = 1 << to
+
+        # pickup pieces
+        self.occupancy[to] = -1
+        not_to_sq = bb.masks.FULL ^ to_sq
+        self.positions[piece] &= not_to_sq
+        self.positions[OFFSET + (self.player^1)] &= not_to_sq
+        self.positions[-1] &= not_to_sq
+
+
+        ### drop pieces
+        self.occupancy[frm] = piece
+        self.positions[piece] |= frm_sq
+        self.positions[OFFSET + (self.player^1)] |= frm_sq
+        self.positions[-1] |= frm_sq
+        # update king position (for check detection)
+        if piece % 8 == WHITE_KING:
+            self.king[self.player] = frm
+
+        # revert capture
+        if cpiece > -1:
+            self.positions[cpiece] |= to_sq
+            self.positions[OFFSET + self.player] |= to_sq
+            self.positions[-1] |= to_sq
+
+
+        ### store pieces TODO
+        ### retreive pieces TODO
+        ### update game status
+        # TODO how do we restore the half move counter?
+        # TODO how do we restore ep square?
+
+        self.player ^= 1
+        self.full_moves += self.player  # update on black
