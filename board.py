@@ -10,7 +10,7 @@ logging.basicConfig(**{
     'format': "[%(levelname)s] %(message)s",
     'filename': "xboard.log",
     'filemode': 'w',
-    'level': logging.DEBUG,
+    'level': logging.CRITICAL,
 })
 
 
@@ -144,6 +144,7 @@ class Board(Serializer):
             attacks = bb.attacks[piece % 8](occ, frm)
             targets = attacks & (bb.masks.FULL ^ friendly)
             if targets & (1<<to) == 0L:
+                import ipdb; ipdb.set_trace()
                 raise InvalidMove("Invalid slider target sq")
             # TODO castling moves
 
@@ -177,7 +178,7 @@ class Board(Serializer):
             self.king[self.player] = to
 
         ### store pieces TODO
-        ### retreive pieces TODO
+        ### retrieve pieces TODO
 
         ### update game status
         if cpiece > -1 or piece % 8 == WHITE_PAWN:
@@ -226,20 +227,69 @@ class Board(Serializer):
         self.positions[-1] |= frm_sq
         # update king position (for check detection)
         if piece % 8 == WHITE_KING:
-            self.king[self.player] = frm
+            self.king[self.player ^ 1] = frm
 
         # revert capture
         if cpiece > -1:
             self.positions[cpiece] |= to_sq
             self.positions[OFFSET + self.player] |= to_sq
             self.positions[-1] |= to_sq
+            self.occupancy[to] = cpiece
 
 
         ### store pieces TODO
-        ### retreive pieces TODO
+        ### retrieve pieces TODO
         ### update game status
         # TODO how do we restore the half move counter?
         # TODO how do we restore ep square?
 
         self.player ^= 1
         self.full_moves += self.player  # update on black
+
+    def move_list(self):
+        moves = []
+
+        occ = self.positions[OFFSET + ALL]
+        empty = ~occ & bb.masks.FULL
+
+        friendly = self.positions[OFFSET + self.player]
+        nfriendly = ~friendly & bb.masks.FULL
+        enemy = self.positions[OFFSET + self.player ^ 1]
+
+
+        # TODO broad phase pawn attack detection
+        pawns = self.positions[WHITE_PAWN | self.player << 3]
+
+        spushes = bb.P_spushes[self.player](pawns, empty)
+        dpushes = bb.P_dpushes[self.player](pawns, empty)
+
+        for frm in bb.get_set_bits(pawns):
+
+            attacks = bb.P_attacks[self.player](enemy, frm)
+            for to in bb.get_set_bits(attacks):
+                moves.append(move.new(frm, to))
+
+            if 1 << frm & spushes:
+                to = frm + 8 - self.player*16
+                moves.append(move.new(frm, to))
+
+            if 1 << frm & dpushes:
+                to = frm + 16 - self.player*32
+                moves.append(move.new(frm, to))
+
+
+        for piece in [WHITE_KING, WHITE_KNIGHT, WHITE_BISHOP, WHITE_ROOK, WHITE_QUEEN]:
+            piece_bb = self.positions[piece | self.player << 3]
+            for frm in bb.get_set_bits(piece_bb):
+                attacks = bb.pieces.attacks[piece](occ, frm) & nfriendly
+                for to in bb.get_set_bits(attacks):
+                    moves.append(move.new(frm, to))
+
+        # only return legal moves
+        for m in moves:
+            try:
+                self.makemove(*m[:2])
+            except KingInCheck:
+                continue
+            self.unmakemove()
+            yield m

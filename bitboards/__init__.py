@@ -25,3 +25,4 @@ from .masks import *
 from .pieces  import *
 from .pawns import *
 from .debug import *
+from twiddling import *
