@@ -10,7 +10,7 @@ def to_bit(san):
 
 
 def san(square):
-    return ''.join([string.uppercase[square % 8], str(square / 8 % 8 + 1)])
+    return ''.join([string.lowercase[square % 8], str(square / 8 % 8 + 1)])
 
 
 def from_fen(board, fen):
