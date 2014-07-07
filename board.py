@@ -313,9 +313,5 @@ class Board(Serializer):
 
         # only return legal moves
         for m in moves:
-            try:
-                self.makemove(*m[:2])
-            except KingInCheck:
-                continue
-            self.unmakemove()
-            yield m
+            if self.is_legal(*m[:2]):
+                yield m
