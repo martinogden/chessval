@@ -76,7 +76,7 @@ class Board(Serializer):
         P = pos[WHITE_PAWN | by_offset]
         if bb.P_attacks[by^1](P, sq): logging.debug("check P"); return True
         N = pos[WHITE_KNIGHT | by_offset]
-        if bb.N_attacks(occ, sq) & N: logging.debug("check N") return True
+        if bb.N_attacks(occ, sq) & N: logging.debug("check N"); return True
         K = pos[WHITE_KING | by_offset]
         if bb.K_attacks(occ, sq) & K: logging.debug("check K"); return True
         B = pos[WHITE_BISHOP | by_offset] | pos[WHITE_QUEEN | by_offset]
@@ -131,7 +131,6 @@ class Board(Serializer):
                 if targets & (1<<to) == 0L:
                     raise InvalidMove("Pawn unable to attack")
 
-            # TODO en passant and promotion moves
         else:
             # all other pieces can be dealt with generically
             attacks = bb.attacks[piece % 8](occ, frm)
@@ -144,8 +143,10 @@ class Board(Serializer):
         #################
         ##### Make move #
         piece = self.occupancy[frm]
+        cpiece = self.occupancy[to]
         frm_sq = 1 << frm
         to_sq = 1 << to
+        flags = 0
 
         ### pickup pieces
         self.occupancy[frm] = -1
@@ -155,10 +156,23 @@ class Board(Serializer):
         self.positions[-1] &= not_frm_sq
 
         # handle capture
-        cpiece = self.occupancy[to]
         if cpiece > -1:
             self.positions[cpiece] &= bb.masks.FULL ^ to_sq
             self.positions[OFFSET + (self.player^1)] &= bb.masks.FULL ^ to_sq
+            flags |= move.flags.CAPTURE
+
+        elif to == self.ep and piece % 8 == WHITE_PAWN:  # handle en passant capture
+            oppnt = self.player^1
+            oppnt_pawn = to - 8 + self.player*16
+            not_c_sq = bb.masks.FULL ^ (1<<oppnt_pawn)
+
+            self.occupancy[oppnt_pawn] = -1
+            self.positions[WHITE_PAWN | oppnt<<3] &= not_c_sq
+            self.positions[OFFSET + oppnt] &= not_c_sq
+            self.positions[-1] &= not_c_sq
+
+            cpiece = WHITE_PAWN | oppnt<<3
+            flags |= move.flags.EP | move.flags.CAPTURE
 
         ### drop pieces
         self.occupancy[to] = piece
@@ -182,15 +196,15 @@ class Board(Serializer):
         self.player ^= 1
 
         # set or reset en passant square
+        self.ep = None
         if piece % 8 == WHITE_PAWN:
             # if frm and to are congruent modulo 16, this is a dbl pawn push.
             delta = to - frm
             if delta % 16 == 0:
                 self.ep = frm + (delta/2)
-        else:
-            self.ep = None
+                flags |= move.flags.DPUSH
 
-        self.moves.append(move.new(frm, to, cpiece))
+        self.moves.append(move.new(frm, to, cpiece, flags))
         if self.is_attacked(self.king[self.player^1], self.player):
             self.unmakemove()
             raise KingInCheck()
@@ -221,8 +235,17 @@ class Board(Serializer):
         if piece % 8 == WHITE_KING:
             self.king[self.player ^ 1] = frm
 
-        # revert capture
-        if cpiece > -1:
+
+        if flags & move.flags.EP:  # revert en passant capture
+            oppnt_pawn = to - 8 + (self.player^1) * 16
+            pawn_sq = 1 << oppnt_pawn
+
+            self.occupancy[oppnt_pawn] = cpiece
+            self.positions[WHITE_PAWN | self.player<<3] |= pawn_sq
+            self.positions[OFFSET + self.player] |= pawn_sq
+            self.positions[-1] |= pawn_sq
+
+        elif flags & move.flags.CAPTURE:  # revert capture
             self.positions[cpiece] |= to_sq
             self.positions[OFFSET + self.player] |= to_sq
             self.positions[-1] |= to_sq
@@ -233,7 +256,13 @@ class Board(Serializer):
         ### retrieve pieces TODO
         ### update game status
         # TODO how do we restore the half move counter?
-        # TODO how do we restore ep square?
+
+        self.ep = None
+        # restore ep square
+        if self.moves:
+            pfrm, pto, pcpiece, pflags = self.moves[-1]
+            if pflags & move.flags.DPUSH:
+                self.ep = pfrm + (pto - pfrm) / 2
 
         self.player ^= 1
         self.full_moves += self.player  # update on black
@@ -247,6 +276,8 @@ class Board(Serializer):
         friendly = self.positions[OFFSET + self.player]
         nfriendly = ~friendly & bb.masks.FULL
         enemy = self.positions[OFFSET + self.player ^ 1]
+        if self.ep:  # treat en passant square as an enemy piece
+            enemy |= (1<<self.ep)
 
 
         # TODO broad phase pawn attack detection
