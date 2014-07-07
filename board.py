@@ -76,16 +76,9 @@ class Board(Serializer):
         P = pos[WHITE_PAWN | by_offset]
         if bb.P_attacks[by^1](P, sq): logging.debug("check P"); return True
         N = pos[WHITE_KNIGHT | by_offset]
-        if bb.N_attacks(occ, sq) & N:
-            logging.debug("check N")
-            logging.debug(pos)
-            logging.debug(WHITE_KNIGHT)
-            logging.debug(by_offset)
-            logging.debug(bb.N_attacks(occ, sq))
-            logging.debug(N)
-            return True
+        if bb.N_attacks(occ, sq) & N: logging.debug("check N") return True
         K = pos[WHITE_KING | by_offset]
-        if bb.K_attacks(occ, sq) & K: logging.debug("check K | sq:%i by:%i", sq, by); return True
+        if bb.K_attacks(occ, sq) & K: logging.debug("check K"); return True
         B = pos[WHITE_BISHOP | by_offset] | pos[WHITE_QUEEN | by_offset]
         if bb.B_attacks(occ, sq) & B: logging.debug("check B"); return True
         R = pos[WHITE_ROOK | by_offset] | pos[WHITE_QUEEN | by_offset]
@@ -144,7 +137,6 @@ class Board(Serializer):
             attacks = bb.attacks[piece % 8](occ, frm)
             targets = attacks & (bb.masks.FULL ^ friendly)
             if targets & (1<<to) == 0L:
-                import ipdb; ipdb.set_trace()
                 raise InvalidMove("Invalid slider target sq")
             # TODO castling moves
 
