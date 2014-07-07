@@ -88,7 +88,7 @@ class Board(Serializer):
         if bb.K_attacks(occ, sq) & K: logging.debug("check K | sq:%i by:%i", sq, by); return True
         B = pos[WHITE_BISHOP | by_offset] | pos[WHITE_QUEEN | by_offset]
         if bb.B_attacks(occ, sq) & B: logging.debug("check B"); return True
-        R = pos[WHITE_BISHOP | by_offset] | pos[WHITE_QUEEN | by_offset]
+        R = pos[WHITE_ROOK | by_offset] | pos[WHITE_QUEEN | by_offset]
         if bb.R_attacks(occ, sq) & R: logging.debug("check R"); return True
 
         return False
