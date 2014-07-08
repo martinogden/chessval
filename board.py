@@ -1,5 +1,4 @@
 import logging
-from collections import deque
 
 from constants import *
 from serialization import Serializer
@@ -39,7 +38,7 @@ class Board(Serializer):
     # [14-16] aggregated bitboards: w / b / all
     positions = [0x0L] * 17
     occupancy = [-1] * 64
-    moves = deque()
+    moves = []
     king = [-1, -1]
 
     def piece_bb(self, piece):
