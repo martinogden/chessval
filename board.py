@@ -58,14 +58,13 @@ class Board(Serializer):
             :todo: add castling moves
             :todo: add promotion moves
         """
-        from_sq = 1<<frm
-        friendly_king = self.king[self.player]
-
-        self.positions[-1] ^= from_sq
-        is_king_attacked = self.is_attacked(friendly_king, self.player^1)
-        self.positions[-1] |= from_sq
-
-        return not is_king_attacked
+        try:
+            self.makemove(frm, to, promotion)
+        except KingInCheck:
+            return False
+        else:
+            self.unmakemove()
+            return True
 
     def is_attacked(self, sq, by):
         pos = self.positions
