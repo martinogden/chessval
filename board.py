@@ -28,8 +28,8 @@ class KingInCheck(ValueError):
 class Board(Serializer):
 
     player = WHITE
-    ep = None
-    castling = 0x00
+    ep = None  # en passant square
+    castling = 0x00  # castling rights
 
     full_moves = 1
     half_moves = 0
@@ -130,12 +130,22 @@ class Board(Serializer):
                     raise InvalidMove("Pawn unable to attack")
 
         else:
-            # all other pieces can be dealt with generically
-            attacks = bb.attacks[piece % 8](occ, frm)
-            targets = attacks & (bb.masks.FULL ^ friendly)
-            if targets & (1<<to) == 0L:
-                raise InvalidMove("Invalid slider target sq")
-            # TODO castling moves
+            # check for castling
+            d = frm - to
+            if piece % 8 == WHITE_KING and not (d % 2 and d % 3):
+                if self.castling & (1<<self.player*2) and not d % 2:
+                    pass  # king side castle
+                elif self.castling & (2<<self.player*2) and not d % 3:
+                    pass  # queen side castle
+                else:
+                    raise InvalidMove("Castling not allowed")
+
+            else:
+                # all other pieces can be dealt with generically
+                attacks = bb.attacks[piece % 8](occ, frm)
+                targets = attacks & (bb.masks.FULL ^ friendly)
+                if targets & (1<<to) == 0L:
+                    raise InvalidMove("Invalid slider target sq")
 
 
         #################
@@ -309,6 +319,19 @@ class Board(Serializer):
                 for to in bb.get_set_bits(attacks):
                     moves.append(move.new(frm, to))
 
+        # castling
+        C_000 = 0x0E << self.player*56
+        C_00 = 0x60 << self.player*56
+        king_sq = self.king[self.player]
+
+        if self.castling & (2<<self.player*2) and C_000 & empty == C_000:
+            # player can queenside castle
+            moves.append(move.new(king_sq, king_sq - 3))
+
+        if self.castling & (1<<self.player*2) and C_00 & empty == C_00:
+            # player can king side castle
+            moves.append(move.new(king_sq, king_sq + 2))
+ 
         # only return legal moves
         for m in moves:
             if self.is_legal(*m[:2]):
