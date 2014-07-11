@@ -117,6 +117,9 @@ class Board(Serializer):
         if piece == -1:
             raise InvalidMove("No piece to move")
 
+        if (piece & 8) >> 3 != self.player:
+            raise InvalidMove("Not side to move")
+
         # pawns are a special case
         if piece % 8 == WHITE_PAWN:
             delta = to - frm
