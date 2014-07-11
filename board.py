@@ -294,9 +294,6 @@ class Board(Serializer):
                 to = frm + 8 - self.player*16
                 moves.append(move.new(frm, to))
 
-
-        for frm in bb.get_set_bits(pawns):
-
             if 1 << frm & dpushes:
                 to = frm + 16 - self.player*32
                 moves.append(move.new(frm, to))
