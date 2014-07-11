@@ -47,6 +47,26 @@ class Board(Serializer):
     def piece_at(self, i):
         return self.occupancy[i]
 
+    def pickup(self, piece, at):
+        # pickup the pieces (Average White Band style)
+        player = piece & 8
+        mask = bb.masks.FULL ^ (1<<at)
+
+        self.occupancy[at] = -1
+        self.positions[piece] &= mask
+        self.positions[OFFSET + side] &= mask
+        self.positions[-1] &= mask
+
+    def drop(self, piece, at):
+        ### drop pieces
+        player = piece & 8
+        sq = 1 << at
+
+        self.occupancy[at] = piece
+        self.positions[piece] |= sq
+        self.positions[OFFSET + side] |= sq
+        self.positions[-1] |= sq
+
     def reset(self, fen=INITIAL_FEN):
         self.positions = [0x0L] * 17
         self.occupancy = [-1] * 64
@@ -156,12 +176,7 @@ class Board(Serializer):
         to_sq = 1 << to
         flags = 0
 
-        ### pickup pieces
-        self.occupancy[frm] = -1
-        not_frm_sq = bb.masks.FULL ^ frm_sq
-        self.positions[piece] &= not_frm_sq
-        self.positions[OFFSET + self.player] &= not_frm_sq
-        self.positions[-1] &= not_frm_sq
+        self.pickup(piece, frm)
 
         # handle capture
         if cpiece > -1:
@@ -172,21 +187,13 @@ class Board(Serializer):
         elif to == self.ep and piece % 8 == WHITE_PAWN:  # handle en passant capture
             oppnt = self.player^1
             oppnt_pawn = to - 8 + self.player*16
-            not_c_sq = bb.masks.FULL ^ (1<<oppnt_pawn)
-
-            self.occupancy[oppnt_pawn] = -1
-            self.positions[WHITE_PAWN | oppnt<<3] &= not_c_sq
-            self.positions[OFFSET + oppnt] &= not_c_sq
-            self.positions[-1] &= not_c_sq
-
             cpiece = WHITE_PAWN | oppnt<<3
+            self.pickup(cpiece, oppnt_pawn, oppnt)
+
             flags |= move.flags.EP | move.flags.CAPTURE
 
-        ### drop pieces
-        self.occupancy[to] = piece
-        self.positions[piece] |= to_sq
-        self.positions[OFFSET + self.player] |= to_sq
-        self.positions[-1] |= to_sq
+        self.drop(piece, to)
+
         # update king position (for check detection)
         if piece % 8 == WHITE_KING:
             self.king[self.player] = to
@@ -226,19 +233,12 @@ class Board(Serializer):
         frm_sq = 1 << frm
         to_sq = 1 << to
 
-        # pickup pieces
-        self.occupancy[to] = -1
-        not_to_sq = bb.masks.FULL ^ to_sq
-        self.positions[piece] &= not_to_sq
-        self.positions[OFFSET + (self.player^1)] &= not_to_sq
-        self.positions[-1] &= not_to_sq
-
+        ### pickup pieces
+        self.pickup(piece, to)
 
         ### drop pieces
-        self.occupancy[frm] = piece
-        self.positions[piece] |= frm_sq
-        self.positions[OFFSET + (self.player^1)] |= frm_sq
-        self.positions[-1] |= frm_sq
+        self.drop(piece, frm)
+
         # update king position (for check detection)
         if piece % 8 == WHITE_KING:
             self.king[self.player ^ 1] = frm
@@ -246,19 +246,9 @@ class Board(Serializer):
 
         if flags & move.flags.EP:  # revert en passant capture
             oppnt_pawn = to - 8 + (self.player^1) * 16
-            pawn_sq = 1 << oppnt_pawn
-
-            self.occupancy[oppnt_pawn] = cpiece
-            self.positions[WHITE_PAWN | self.player<<3] |= pawn_sq
-            self.positions[OFFSET + self.player] |= pawn_sq
-            self.positions[-1] |= pawn_sq
-
+            self.drop(cpiece, oppnt_pawn)
         elif flags & move.flags.CAPTURE:  # revert capture
-            self.positions[cpiece] |= to_sq
-            self.positions[OFFSET + self.player] |= to_sq
-            self.positions[-1] |= to_sq
-            self.occupancy[to] = cpiece
-
+            self.drop(cpiece, to)
 
         ### store pieces TODO
         ### retrieve pieces TODO
