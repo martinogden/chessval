@@ -41,12 +41,6 @@ class Board(Serializer):
     moves = []
     king = [-1, -1]
 
-    def piece_bb(self, piece):
-        return self.positions[piece]
-
-    def piece_at(self, i):
-        return self.occupancy[i]
-
     def pickup(self, piece, at):
         # pickup the pieces (Average White Band style)
         player = (piece & 8) >> 3
