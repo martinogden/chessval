@@ -49,22 +49,22 @@ class Board(Serializer):
 
     def pickup(self, piece, at):
         # pickup the pieces (Average White Band style)
-        player = piece & 8
+        player = (piece & 8) >> 3
         mask = bb.masks.FULL ^ (1<<at)
 
         self.occupancy[at] = -1
         self.positions[piece] &= mask
-        self.positions[OFFSET + side] &= mask
+        self.positions[OFFSET + player] &= mask
         self.positions[-1] &= mask
 
     def drop(self, piece, at):
         ### drop pieces
-        player = piece & 8
+        player = (piece & 8) >> 3
         sq = 1 << at
 
         self.occupancy[at] = piece
         self.positions[piece] |= sq
-        self.positions[OFFSET + side] |= sq
+        self.positions[OFFSET + player] |= sq
         self.positions[-1] |= sq
 
     def reset(self, fen=INITIAL_FEN):
@@ -172,23 +172,22 @@ class Board(Serializer):
         ##### Make move #
         piece = self.occupancy[frm]
         cpiece = self.occupancy[to]
-        frm_sq = 1 << frm
-        to_sq = 1 << to
         flags = 0
 
         self.pickup(piece, frm)
 
         # handle capture
         if cpiece > -1:
-            self.positions[cpiece] &= bb.masks.FULL ^ to_sq
-            self.positions[OFFSET + (self.player^1)] &= bb.masks.FULL ^ to_sq
+            mask = bb.masks.FULL ^ (1 << to)
+            self.positions[cpiece] &= mask
+            self.positions[OFFSET + (self.player^1)] &= mask
             flags |= move.flags.CAPTURE
 
         elif to == self.ep and piece % 8 == WHITE_PAWN:  # handle en passant capture
             oppnt = self.player^1
             oppnt_pawn = to - 8 + self.player*16
             cpiece = WHITE_PAWN | oppnt<<3
-            self.pickup(cpiece, oppnt_pawn, oppnt)
+            self.pickup(cpiece, oppnt_pawn)
 
             flags |= move.flags.EP | move.flags.CAPTURE
 
