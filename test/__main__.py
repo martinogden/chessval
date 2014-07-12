@@ -5,7 +5,7 @@ from board import Board
 
 
 board = Board()
-debugger = Debugger(board, quiet=True)
+debugger = Debugger(board, quiet=False)
 
 
 def parse_perftsuite():
@@ -22,8 +22,8 @@ for fen, results in parse_perftsuite():
     l += 1
     board.reset(fen)
     try:
-        assert debugger.divide(3) == results['D3']
-        print ".",
-    except (Exception, AssertionError) as e:
+        assert debugger.divide(5) == results['D5']
+        print "\n" +"+"*20+"\n"
+    except AssertionError as e:
         print l, fen
         import pdb; pdb.set_trace()

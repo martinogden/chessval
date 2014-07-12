@@ -16,8 +16,8 @@ class Debugger(object):
             return len(list(moves))
 
         nodes = 0
-        for frm, to, cpiece, flags, cr in moves:
-            self.board.makemove(frm, to)
+        for frm, to, cpiece, flags, cr, promotion in moves:
+            self.board.makemove(frm, to, promotion=promotion)
             nodes += self.perft(depth - 1)
             self.board.unmakemove()
         return nodes
@@ -25,13 +25,14 @@ class Debugger(object):
     def divide(self, depth=3):
         nodes = 0
         moves = list(self.board.move_list())
-        for frm, to, cpiece, flags, cr in moves:
-            self.board.makemove(frm, to)
+        for frm, to, cpiece, flags, cr, promotion in moves:
+            self.board.makemove(frm, to, promotion=promotion)
             result = self.perft(depth - 1)
             nodes += result
             self.board.unmakemove()
             if not self.quiet:
-                print "%s%s: %i" % (san(frm), san(to), result)
+                p = promotion and "--nbrq"[promotion % 8] or ""
+                print "%s%s%s: %i" % (san(frm), san(to), p, result)
 
         if not self.quiet:
             print "\n============"

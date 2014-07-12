@@ -123,6 +123,14 @@ class Board(Serializer):
         if (piece & 8) >> 3 != self.player:
             raise InvalidMove("Not side to move")
 
+        if promotion:
+            if piece % 8 != WHITE_PAWN:
+                raise InvalidMove("Only pawns can be promoted")
+            if not 1 << to & bb.masks.RANK_MASK[7*(self.player^1)]:
+                raise InvalidMove("Pawn cannot be promoted here")
+            if (promotion & 8) >> 3 != self.player:
+                raise InvalidMove("Invalid promotion piece")
+
         # pawns are a special case
         if piece % 8 == WHITE_PAWN:
             delta = to - frm
@@ -208,7 +216,10 @@ class Board(Serializer):
             flags |= move.flags.EP | move.flags.CAPTURE
 
         ### drop the pieces
-        self.drop(piece, to)
+        if promotion:
+            self.drop(promotion, to)
+        else:
+            self.drop(piece, to)
 
         if is_castling:
             rook_sq = to > frm and frm + 1 or frm - 1
@@ -259,7 +270,7 @@ class Board(Serializer):
                 self.ep = frm + (delta/2)
                 flags |= move.flags.DPUSH
 
-        self.moves.append(move.new(frm, to, cpiece, flags, cr))
+        self.moves.append(move.new(frm, to, cpiece, flags, cr, promotion))
         if self.is_attacked(self.king[self.player^1], self.player):
             self.unmakemove()
             raise KingInCheck()
@@ -267,7 +278,7 @@ class Board(Serializer):
     def unmakemove(self):
         mv = self.moves.pop()
         logging.debug("unmakemove: %s", mv)
-        frm, to, cpiece, flags, cr = mv
+        frm, to, cpiece, flags, cr, promotion = mv
         friendly_rook = WHITE_ROOK | (self.player^1)<<3  # for castling
 
         piece = self.occupancy[to]
@@ -285,7 +296,10 @@ class Board(Serializer):
 
 
         ### drop pieces
-        self.drop(piece, frm)
+        if promotion:
+            self.drop(WHITE_PAWN | (self.player^1)<<3, frm)
+        else:
+            self.drop(piece, frm)
 
         if flags & move.flags.KCASTLE:
             self.drop(friendly_rook, frm + 3)
@@ -312,7 +326,7 @@ class Board(Serializer):
         self.ep = None
         # restore ep square
         if self.moves:
-            pfrm, pto, pcpiece, pflags, pcr = self.moves[-1]
+            pfrm, pto, pcpiece, pflags, pcr, ppromotion = self.moves[-1]
             if pflags & move.flags.DPUSH:
                 self.ep = pfrm + (pto - pfrm) / 2
 
@@ -334,6 +348,15 @@ class Board(Serializer):
 
 
         # TODO broad phase pawn attack detection
+        def do_promo(frm, to):
+            # check for promotions
+            if 1 << to & bb.masks.RANK_MASK[7*(self.player^1)]:
+                for piece in [WHITE_KNIGHT, WHITE_BISHOP, WHITE_ROOK, WHITE_QUEEN]:
+                    moves.append(move.new(frm, to, promotion=piece | self.player<<3))
+            else:
+                # otherwise, just a normal push / attack
+                moves.append(move.new(frm, to))
+
         pawns = self.positions[WHITE_PAWN | self.player << 3]
 
         spushes = bb.P_spushes[self.player](pawns, empty)
@@ -343,11 +366,11 @@ class Board(Serializer):
 
             attacks = bb.P_attacks[self.player](enemy, frm)
             for to in bb.get_set_bits(attacks):
-                moves.append(move.new(frm, to))
+                do_promo(frm, to)
 
             if 1 << frm & spushes:
                 to = frm + 8 - self.player*16
-                moves.append(move.new(frm, to))
+                do_promo(frm, to)
 
             if 1 << frm & dpushes:
                 to = frm + 16 - self.player*32
