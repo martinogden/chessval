@@ -1,39 +1,40 @@
-import sys
-from board import Board
-from inout import san
+from inout import san, to_bit
 
 
-board = Board()
-def perft(depth=3):
-    if depth == 0:
-        return 1
+class Debugger(object):
 
-    moves = board.move_list()
-    if depth == 1:
-        return len(list(moves))
+    def __init__(self, board, quiet=False):
+        self.board = board
+        self.quiet = quiet
 
-    nodes = 0
-    for frm, to, cpiece, flags in moves:
-        board.makemove(frm, to)
-        nodes += perft(depth - 1)
-        board.unmakemove()
-    return nodes
+    def perft(self, depth=3):
+        if depth == 0:
+            return 1
 
+        moves = self.board.move_list()
+        if depth == 1:
+            return len(list(moves))
 
-def divide(depth=3):
-    nodes = 0
-    moves = list(board.move_list())
-    for frm, to, cpiece, flags in moves:
-        board.makemove(frm, to)
-        result = perft(depth - 1)
-        nodes += result
-        board.unmakemove()
-        print "%s%s: %i" % (san(frm), san(to), result)
+        nodes = 0
+        for frm, to, cpiece, flags, cr in moves:
+            self.board.makemove(frm, to)
+            nodes += self.perft(depth - 1)
+            self.board.unmakemove()
+        return nodes
 
-    print "\n============"
-    print "Moves: %i" % len(moves)
-    print "Nodes: %i" % nodes
+    def divide(self, depth=3):
+        nodes = 0
+        moves = list(self.board.move_list())
+        for frm, to, cpiece, flags, cr in moves:
+            self.board.makemove(frm, to)
+            result = self.perft(depth - 1)
+            nodes += result
+            self.board.unmakemove()
+            if not self.quiet:
+                print "%s%s: %i" % (san(frm), san(to), result)
 
-
-depth = int(sys.argv[1])
-divide(depth)
+        if not self.quiet:
+            print "\n============"
+            print "Moves: %i" % len(moves)
+            print "Nodes: %i" % nodes
+        return nodes
