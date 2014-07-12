@@ -61,6 +61,8 @@ class Serializer(object):
                     ranks[rank] += str(gap)         #   output gap
                     gap = 0                         #   reset gap
                 ranks[rank] += PIECES[occ]          # output piece
+        if gap > 0:
+            ranks[rank] += str(gap)
 
         c = self.castling
         castling = "".join(["KQkq"[i] for i in xrange(4) if c & (1<<i)])
@@ -74,9 +76,11 @@ class Serializer(object):
         )
         return " ".join(output)
 
+    def u(self):
+        print unicode(self)
+
     def setboard(self, fen):
         """ Load a game from a fen representation """
-
         p = self.positions
         position, player, castling, ep, hm, fm = fen.split(' ')
         ranks = reversed(position.split('/'))

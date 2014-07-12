@@ -64,6 +64,12 @@ class Board(Serializer):
     def reset(self, fen=INITIAL_FEN):
         self.positions = [0x0L] * 17
         self.occupancy = [-1] * 64
+        self.ep = None
+        self.castling = 0
+        full_moves = 1
+        half_moves = 0
+        self.moves = []
+        king = [-1, -1]
         self.setboard(fen)
 
     def is_legal(self, frm, to, promotion=None):
@@ -107,8 +113,9 @@ class Board(Serializer):
         occ = self.positions[-1]
         friendly = self.positions[OFFSET + self.player]
         piece = self.occupancy[frm]
+        cr = self.castling
         d = frm - to
-        is_castling = piece % 8 == WHITE_KING and d in [-3, -2, 2, 3]  # todo do this properly
+        is_castling = piece % 8 == WHITE_KING and d in [-2, 2]  # todo do this properly
 
         if piece == -1:
             raise InvalidMove("No piece to move")
@@ -151,13 +158,17 @@ class Board(Serializer):
         else:
             # validate castling
             if is_castling:
-                if self.castling & (1<<self.player*2) and not d % 2:
-                    pass  # king side castle
-                elif self.castling & (2<<self.player*2) and not d % 3:
-                    pass  # queen side castle
+                if self.castling & (1<<self.player*2) and d == -2:
+                    rook_sq = frm + 1  # king side castle
+                elif self.castling & (2<<self.player*2) and d == 2:
+                    rook_sq = frm - 1  # queen side castle
                 else:
                     raise InvalidMove("Castling not allowed")
 
+                if self.is_attacked(rook_sq, self.player^1):
+                    raise InvalidMove("Castling not allowed: King passes through attacked square")
+                if self.is_attacked(frm, self.player^1):
+                    raise InvalidMove("Castling not allowed: King in check")
             else:
                 # all other pieces can be dealt with generically
                 attacks = bb.attacks[piece % 8](occ, frm)
@@ -200,7 +211,7 @@ class Board(Serializer):
         self.drop(piece, to)
 
         if is_castling:
-            rook_sq = to > frm and frm + 1 or frm - 2
+            rook_sq = to > frm and frm + 1 or frm - 1
             self.drop(WHITE_ROOK | self.player<<3, rook_sq)
 
         # update king position (for check detection)
@@ -216,13 +227,25 @@ class Board(Serializer):
         else:
             self.half_moves += 1
 
+
+        W_rooks = self.positions[WHITE_ROOK]
+        W_king = self.king[WHITE]
+        B_rooks = self.positions[WHITE_ROOK | 8]
+        B_king = self.king[BLACK]
+        if not (1<<7 & W_rooks and W_king == 4):
+            self.castling &= 0xF ^ castling.WHITE_00
+        if not (1 & W_rooks and W_king == 4):
+            self.castling &= 0xF ^ castling.WHITE_000
+        if not (1<<63 & B_rooks and B_king == 60):
+            self.castling &= 0xF ^ castling.BLACK_00
+        if not (1<<56 & B_rooks and B_king == 60):
+            self.castling &= 0xF ^ castling.BLACK_000
+
         if is_castling:
             if to > frm:  # king-side
                 flags |= move.flags.KCASTLE
-                self.castling ^= 1<<self.player*2
             else:  # queen-side
                 flags |= move.flags.QCASTLE
-                self.castling ^= 2<<self.player*2
 
         self.full_moves += self.player  # update on black
         self.player ^= 1
@@ -236,16 +259,15 @@ class Board(Serializer):
                 self.ep = frm + (delta/2)
                 flags |= move.flags.DPUSH
 
-        self.moves.append(move.new(frm, to, cpiece, flags))
+        self.moves.append(move.new(frm, to, cpiece, flags, cr))
         if self.is_attacked(self.king[self.player^1], self.player):
-            import ipdb; ipdb.set_trace()
             self.unmakemove()
             raise KingInCheck()
 
     def unmakemove(self):
         mv = self.moves.pop()
         logging.debug("unmakemove: %s", mv)
-        frm, to, cpiece, flags = mv
+        frm, to, cpiece, flags, cr = mv
         friendly_rook = WHITE_ROOK | (self.player^1)<<3  # for castling
 
         piece = self.occupancy[to]
@@ -257,18 +279,18 @@ class Board(Serializer):
         self.pickup(piece, to)
 
         if flags & move.flags.KCASTLE:
-            self.pickup(friendly_rook, to - 1)
+            self.pickup(friendly_rook, frm + 1)
         elif flags & move.flags.QCASTLE:
-            self.pickup(friendly_rook, to + 1)
+            self.pickup(friendly_rook, frm - 1)
 
 
         ### drop pieces
         self.drop(piece, frm)
 
         if flags & move.flags.KCASTLE:
-            self.drop(friendly_rook, to + 1)
+            self.drop(friendly_rook, frm + 3)
         elif flags & move.flags.QCASTLE:
-            self.drop(friendly_rook, to - 1)
+            self.drop(friendly_rook, frm - 4)
 
 
         # update king position (for check detection)
@@ -290,12 +312,13 @@ class Board(Serializer):
         self.ep = None
         # restore ep square
         if self.moves:
-            pfrm, pto, pcpiece, pflags = self.moves[-1]
+            pfrm, pto, pcpiece, pflags, pcr = self.moves[-1]
             if pflags & move.flags.DPUSH:
                 self.ep = pfrm + (pto - pfrm) / 2
 
         self.player ^= 1
-        self.full_moves += self.player  # update on black
+        self.full_moves -= self.player  # update on black
+        self.castling = cr
 
     def move_list(self):
         moves = []
@@ -343,11 +366,17 @@ class Board(Serializer):
         C_00 = 0x60 << self.player*56
         king_sq = self.king[self.player]
 
-        if self.castling & (2<<self.player*2) and C_000 & empty == C_000:
+        if self.castling & (2<<self.player*2) and C_000 & empty == C_000 and\
+                not self.is_attacked(king_sq - 1, self.player^1) and\
+                not self.is_attacked(king_sq, self.player^1) and\
+                1<<king_sq & bb.masks.FILE_MASK[4]:
             # player can queenside castle
-            moves.append(move.new(king_sq, king_sq - 3))
+            moves.append(move.new(king_sq, king_sq - 2))
 
-        if self.castling & (1<<self.player*2) and C_00 & empty == C_00:
+        if self.castling & (1<<self.player*2) and C_00 & empty == C_00 and\
+                not self.is_attacked(king_sq + 1, self.player^1) and\
+                not self.is_attacked(king_sq, self.player^1) and\
+                1<<king_sq & bb.masks.FILE_MASK[4]:
             # player can king side castle
             moves.append(move.new(king_sq, king_sq + 2))
  
