@@ -368,15 +368,13 @@ class Board(Serializer):
 
         if self.castling & (2<<self.player*2) and C_000 & empty == C_000 and\
                 not self.is_attacked(king_sq - 1, self.player^1) and\
-                not self.is_attacked(king_sq, self.player^1) and\
-                1<<king_sq & bb.masks.FILE_MASK[4]:
+                not self.is_attacked(king_sq, self.player^1):
             # player can queenside castle
             moves.append(move.new(king_sq, king_sq - 2))
 
         if self.castling & (1<<self.player*2) and C_00 & empty == C_00 and\
                 not self.is_attacked(king_sq + 1, self.player^1) and\
-                not self.is_attacked(king_sq, self.player^1) and\
-                1<<king_sq & bb.masks.FILE_MASK[4]:
+                not self.is_attacked(king_sq, self.player^1):
             # player can king side castle
             moves.append(move.new(king_sq, king_sq + 2))
  
