@@ -7,7 +7,7 @@ import move
 
 logging.basicConfig(**{
     'format': "[%(levelname)s] %(message)s",
-    'filename': "xboard.log",
+    'filename': "/var/log/chessval/chessval.log",
     'filemode': 'w',
     'level': logging.CRITICAL,
 })

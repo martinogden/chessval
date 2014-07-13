@@ -1,4 +1,4 @@
-from inout import san, to_bit
+from serialization import san, to_bit
 
 
 class Debugger(object):
