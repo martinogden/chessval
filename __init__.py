@@ -6,7 +6,7 @@ from board import Board, KingInCheck, InvalidMove
 from serialization import to_bit
 
 
-LAN_PATT = r"([a-g]{1}[1-8]{1})([a-g]{1}[1-8]{1})([nbrq]{1})?"
+LAN_PATT = r"([a-g]{1}[1-8]{1})-([a-g]{1}[1-8]{1})([nbrq]{1})?"
 
 
 class Chess(object):

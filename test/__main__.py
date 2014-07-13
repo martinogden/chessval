@@ -1,11 +1,16 @@
+import sys
 import csv
 
 from debug import Debugger
 from board import Board
 
+if len(sys.argv) > 1:
+    depth = int(sys.argv[1])
+    assert 0 < depth < 7
+
 
 board = Board()
-debugger = Debugger(board, quiet=False)
+debugger = Debugger(board, quiet=True)
 
 
 def parse_perftsuite():
@@ -21,10 +26,12 @@ l = 0
 for fen, results in parse_perftsuite():
     l += 1
     board.reset(fen)
-    if not 'D6' in results: continue
+    if not 'D%i' % depth in results: continue
     try:
-        assert debugger.divide(6) == results['D6']
-        print "\n" +"+"*20+"\n"
+        assert debugger.divide(depth) == results['D%i' % depth]
     except AssertionError as e:
+        print "Error\n====="
         print l, fen
         import pdb; pdb.set_trace()
+
+print "OK"

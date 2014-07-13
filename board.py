@@ -5,13 +5,6 @@ from serialization import Serializer
 import bitboards as bb
 import move
 
-logging.basicConfig(**{
-    'format': "[%(levelname)s] %(message)s",
-    'filename': "/var/log/chessval/chessval.log",
-    'filemode': 'w',
-    'level': logging.CRITICAL,
-})
-
 
 OFFSET = 14
 MAX_MOVES = 100
