@@ -30,6 +30,7 @@ class Board(Serializer):
     # [00-13] list of bitboards foreach piece type
     # [14-16] aggregated bitboards: w / b / all
     positions = [0x0L] * 17
+    material = [0] * 14
     occupancy = [-1] * 64
     moves = []
     king = [-1, -1]
@@ -222,8 +223,14 @@ class Board(Serializer):
         if piece % 8 == WHITE_KING:
             self.king[self.player] = to
 
-        ### store pieces TODO
-        ### retrieve pieces TODO
+
+        # Store / retrieve pieces
+        if cpiece > -1:
+            self.material[cpiece] -= 1
+        if promotion:
+            self.material[WHITE_PAWN | self.player<<3] -= 1
+            self.material[promotion] += 1
+
 
         ### update game status
         if cpiece > -1 or piece % 8 == WHITE_PAWN:
@@ -299,22 +306,27 @@ class Board(Serializer):
         elif flags & move.flags.QCASTLE:
             self.drop(friendly_rook, frm - 4)
 
-
-        # update king position (for check detection)
-        if piece % 8 == WHITE_KING:
-            self.king[self.player ^ 1] = frm
-
-
         if flags & move.flags.EP:  # revert en passant capture
             oppnt_pawn = to - 8 + (self.player^1) * 16
             self.drop(cpiece, oppnt_pawn)
         elif flags & move.flags.CAPTURE:  # revert capture
             self.drop(cpiece, to)
 
-        ### store pieces TODO
-        ### retrieve pieces TODO
+
+        # Store / retrieve pieces
+        if flags & move.flags.CAPTURE:
+            self.material[cpiece] += 1
+        if promotion:
+            self.material[WHITE_PAWN | self.player<<3] += 1
+            self.material[promotion] -= 1
+
+
         ### update game status
-        # TODO how do we restore the half move counter?
+        # TODO restore the half move counter
+
+        # update king position (for check detection)
+        if piece % 8 == WHITE_KING:
+            self.king[self.player ^ 1] = frm
 
         self.ep = None
         # restore ep square

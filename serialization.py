@@ -97,6 +97,7 @@ class Serializer(object):
                     self.positions[piece] |= 1<<bit
                     self.positions[cbb] |= 1<<bit
                     self.positions[-1] |= 1<<bit
+                    self.material[piece] += 1
                     if piece % 8 == WHITE_KING:
                         self.king[piece>>3] = bit
                     bit += 1
