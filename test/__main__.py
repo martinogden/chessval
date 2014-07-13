@@ -21,8 +21,9 @@ l = 0
 for fen, results in parse_perftsuite():
     l += 1
     board.reset(fen)
+    if not 'D6' in results: continue
     try:
-        assert debugger.divide(5) == results['D5']
+        assert debugger.divide(6) == results['D6']
         print "\n" +"+"*20+"\n"
     except AssertionError as e:
         print l, fen
