@@ -20,20 +20,23 @@ class KingInCheck(ValueError):
 
 class Board(Serializer):
 
-    player = WHITE
-    ep = None  # en passant square
-    castling = 0x00  # castling rights
+    def __init__(self, fen=INITIAL_FEN):
+        self.reset(fen)
 
-    full_moves = 1
-    half_moves = 0
-
-    # [00-13] list of bitboards foreach piece type
-    # [14-16] aggregated bitboards: w / b / all
-    positions = [0x0L] * 17
-    material = [0] * 14
-    occupancy = [-1] * 64
-    moves = []
-    king = [-1, -1]
+    def reset(self, fen=INITIAL_FEN):
+        self.player = WHITE
+        # [00-13] list of bitboards foreach piece type
+        # [14-16] aggregated bitboards: w / b / all
+        self.positions = [0x00] * 17
+        self.occupancy = [-1] * 64
+        self.material = [0] * 14
+        self.ep = None  # en passant square
+        self.castling = 0x00  # castling rights
+        self.full_moves = 1
+        self.half_moves = 0
+        self.moves = []
+        self.king = [-1, -1]
+        self.setboard(fen)
 
     def pickup(self, piece, at):
         # pickup the pieces (Average White Band style)
@@ -54,17 +57,6 @@ class Board(Serializer):
         self.positions[piece] |= sq
         self.positions[OFFSET + player] |= sq
         self.positions[-1] |= sq
-
-    def reset(self, fen=INITIAL_FEN):
-        self.positions = [0x0L] * 17
-        self.occupancy = [-1] * 64
-        self.ep = None
-        self.castling = 0
-        full_moves = 1
-        half_moves = 0
-        self.moves = []
-        king = [-1, -1]
-        self.setboard(fen)
 
     def is_legal(self, frm, to, promotion=None):
         """ Check if move frm sq `frm` to square `to` is legal
@@ -103,7 +95,6 @@ class Board(Serializer):
             :todo: add castling moves
             :todo: add promotion moves
         """
-
         occ = self.positions[-1]
         friendly = self.positions[OFFSET + self.player]
         piece = self.occupancy[frm]
@@ -314,10 +305,10 @@ class Board(Serializer):
 
 
         # Store / retrieve pieces
-        if flags & move.flags.CAPTURE:
+        if cpiece > -1:
             self.material[cpiece] += 1
         if promotion:
-            self.material[WHITE_PAWN | self.player<<3] += 1
+            self.material[WHITE_PAWN | (self.player^1)<<3] += 1
             self.material[promotion] -= 1
 
 

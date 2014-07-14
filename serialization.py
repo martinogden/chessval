@@ -21,9 +21,6 @@ def san(sq):
 
 class Serializer(object):
 
-    def __init__(self, fen=INITIAL_FEN):
-        self.setboard(fen)
-
     def __unicode__(self):
         """ Human friendly board output """
 
