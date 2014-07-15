@@ -3,23 +3,6 @@ from constants import *
 
 DEBUG = False
 
-class TreeNode(object):
-
-	def __init__(self, value, parent=None):
-		self.value = value
-		self.children = []
-
-	def __repr__(self, level=0):
-		val = "%s%s\n" % ("> " * level, self.value)
-		for child in self.children:
-			val += child.__repr__(level+1)
-		return val
-
-	def add_child(self, value):
-		node = TreeNode(value, parent=self)
-		self.children.append(node)
-		return node
-
 
 def evaluate(board):
 	M = board.material
@@ -46,16 +29,14 @@ def evaluate(board):
 
 def negamax(board, depth):
 
-	def inner(alpha, beta, depth, parent):
+	def inner(alpha, beta, depth):
 		if depth == 0:
 			return evaluate(board)
 
 		for move in board.move_list():
 			frm, to, cpiece, _, _, promo = move
 			board.makemove(frm, to, promotion=promo)
-			child = parent.add_child(None)
-			score = -inner(-beta, -alpha, depth - 1, child)
-			child.value = score
+			score = -inner(-beta, -alpha, depth - 1)
 			board.unmakemove()
 
 			if score >= beta:
@@ -64,14 +45,9 @@ def negamax(board, depth):
 				alpha = score
 		return alpha
 
-	root = TreeNode(None)
-	score = inner(float("-inf"), float("inf"), depth, root)
-	root.value = score
-	if DEBUG:
-		print root
 	sys.stdout.write(".")
 	sys.stdout.flush()
-	return score
+	return inner(float("-inf"), float("inf"), depth)
 
 
 class AI(object):
