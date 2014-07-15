@@ -30,6 +30,7 @@ class Board(Serializer):
         self.positions = [0x00] * 17
         self.occupancy = [-1] * 64
         self.material = [0] * 14
+        self.hash = 0
         self.ep = None  # en passant square
         self.castling = 0x00  # castling rights
         self.full_moves = 1
@@ -47,6 +48,7 @@ class Board(Serializer):
         self.positions[piece] &= mask
         self.positions[OFFSET + player] &= mask
         self.positions[-1] &= mask
+        self.hash ^= ZOBR_PIECE_SQ[piece][at]
 
     def drop(self, piece, at):
         ### drop pieces
@@ -57,6 +59,7 @@ class Board(Serializer):
         self.positions[piece] |= sq
         self.positions[OFFSET + player] |= sq
         self.positions[-1] |= sq
+        self.hash ^= ZOBR_PIECE_SQ[piece][at]
 
     def is_legal(self, frm, to, promotion=None):
         """ Check if move frm sq `frm` to square `to` is legal
@@ -257,7 +260,9 @@ class Board(Serializer):
                 flags |= move.flags.QCASTLE
 
         self.full_moves += self.player  # update on black
+        self.hash ^= ZOBR_PLAYER[self.player]
         self.player ^= 1
+        self.hash ^= ZOBR_PLAYER[self.player]
 
         # set or reset en passant square
         self.ep = None
@@ -333,7 +338,9 @@ class Board(Serializer):
             if pflags & move.flags.DPUSH:
                 self.ep = pfrm + (pto - pfrm) / 2
 
+        self.hash ^= ZOBR_PLAYER[self.player]
         self.player ^= 1
+        self.hash ^= ZOBR_PLAYER[self.player]
         self.full_moves -= self.player  # update on black
         self.castling = cr
 

@@ -3,8 +3,12 @@ from constants import *
 
 DEBUG = False
 
+transposition = {}
 
 def evaluate(board):
+	if board.hash in transposition:
+		return transposition[board.hash]
+
 	M = board.material
 	sign = 1 if board.player == WHITE else -1
 
@@ -24,7 +28,9 @@ def evaluate(board):
 		else:
 			piece_sq_score += PIECE_SQ_SCORE[piece][sq]
 
-	return sign * (material_score + piece_sq_score)
+	score = sign * (material_score + piece_sq_score)
+	transposition[board.hash] = score
+	return score
 
 
 def negamax(board, depth):
@@ -52,7 +58,7 @@ def negamax(board, depth):
 
 class AI(object):
 
-	DEFAULT_SEARCH_DEPTH = 4
+	DEFAULT_SEARCH_DEPTH = 3
 
 	def __init__(self, board, depth=DEFAULT_SEARCH_DEPTH):
 		self.board = board

@@ -95,6 +95,7 @@ class Serializer(object):
                     self.positions[cbb] |= 1<<bit
                     self.positions[-1] |= 1<<bit
                     self.material[piece] += 1
+                    self.hash ^= ZOBR_PIECE_SQ[piece][bit]
                     if piece % 8 == WHITE_KING:
                         self.king[piece>>3] = bit
                     bit += 1
@@ -105,6 +106,7 @@ class Serializer(object):
                 self.castling |= (1<<"KQkq".index(c))
 
         self.player = "wb".index(player)
+        self.hash ^= ZOBR_PLAYER[self.player]
         self.ep = ep != EMPTY and to_bit(ep) or None
         self.half_moves = int(hm)
         self.full_moves = int(fm)

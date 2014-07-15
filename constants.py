@@ -1,3 +1,6 @@
+import random
+
+
 INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
 WHITE = 0x00
@@ -182,3 +185,18 @@ PIECE_SQ_SCORE = (
 		-20,-10,-10, -5, -5,-10,-10,-20,
 	),
 )
+
+
+# Zobrist psuedo-random numbers
+K = 64
+random.seed(9281379828507406)
+rand = lambda: random.getrandbits(K)
+
+ZOBR_PIECE_SQ = tuple([tuple([rand() for sq in xrange(64)]) for p in xrange(14)])
+ZOBR_PLAYER = [0, rand()]
+ZOBR_EP = tuple([rand() for _ in xrange(64)])
+
+ZOBR_CR_WHITE_00 = rand()
+ZOBR_CR_WHITE_000 = rand()
+ZOBR_CR_BLACK_00 = rand()
+ZOBR_CR_BLACK_000 = rand()
