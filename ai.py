@@ -26,14 +26,22 @@ def evaluate(board):
 	sign = 1 if board.player == WHITE else -1
 
 	material_score = sum([
-		(M[WHITE_QUEEN] - M[WHITE_QUEEN | 8]) * 9,
-		(M[WHITE_ROOK] - M[WHITE_ROOK | 8]) * 5,
-		(M[WHITE_BISHOP] - M[WHITE_BISHOP | 8]) * 3,
-		(M[WHITE_KNIGHT] - M[WHITE_KNIGHT | 8]) * 3,
-		(M[WHITE_PAWN] - M[WHITE_PAWN | 8]) * 1,
+		(M[WHITE_QUEEN] - M[BLACK_QUEEN]) * PIECE_SCORE[WHITE_QUEEN],
+		(M[WHITE_ROOK] - M[BLACK_ROOK]) * PIECE_SCORE[WHITE_ROOK],
+		(M[WHITE_BISHOP] - M[BLACK_BISHOP]) * PIECE_SCORE[WHITE_BISHOP],
+		(M[WHITE_KNIGHT] - M[BLACK_KNIGHT]) * PIECE_SCORE[WHITE_KNIGHT],
+		(M[WHITE_PAWN] - M[BLACK_PAWN]) * PIECE_SCORE[WHITE_PAWN],
 	])
 
-	return sign * material_score
+	piece_sq_score = 0
+	for sq, piece in enumerate(board.occupancy):
+		if piece == -1: continue
+		if piece & 8:
+			piece_sq_score -= PIECE_SQ_SCORE[piece][sq]
+		else:
+			piece_sq_score += PIECE_SQ_SCORE[piece][sq]
+
+	return sign * (material_score + piece_sq_score)
 
 
 def negamax(board, depth):
@@ -68,10 +76,11 @@ def negamax(board, depth):
 
 class AI(object):
 
-	SEARCH_DEPTH = 4
+	DEFAULT_SEARCH_DEPTH = 4
 
-	def __init__(self, board):
+	def __init__(self, board, depth=DEFAULT_SEARCH_DEPTH):
 		self.board = board
+		self.depth = depth
 
 	def best_move(self):
 		move_list = self.board.move_list()
@@ -82,7 +91,7 @@ class AI(object):
 			frm, to, _, _, _, promo = move
 
 			self.board.makemove(frm, to, promotion=promo)
-			score = negamax(self.board, self.SEARCH_DEPTH)
+			score = -negamax(self.board, self.depth)
 			self.board.unmakemove()
 
 			if score > max_:
