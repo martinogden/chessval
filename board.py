@@ -232,7 +232,7 @@ class Board(Serializer):
 
         W_rooks = self.positions[WHITE_ROOK]
         W_king = self.king[WHITE]
-        B_rooks = self.positions[WHITE_ROOK | 8]
+        B_rooks = self.positions[BLACK_ROOK]
         B_king = self.king[BLACK]
         if not (1<<7 & W_rooks and W_king == 4):
             self.castling &= 0xF ^ castling.WHITE_00
