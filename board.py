@@ -122,12 +122,17 @@ class Board(Serializer):
             my_pawns = self.positions[piece]
             empty = occ ^ bb.masks.FULL
 
+            if not delta:
+                raise InvalidMove("Invalid pawn move")
+
             # if delta is congruent modulo. 8, this is pawn push
-            if delta and delta % 8 == 0:  
+            if delta % 8 == 0:
                 if delta % 16 == 0:  # double push
                     p_pawns = bb.P_dpushes[self.player](my_pawns, empty)
-                else:  # single push
+                elif delta % 8 == 0:  # single push
                     p_pawns = bb.P_spushes[self.player](my_pawns, empty)
+                else:
+                    raise InvalidMove("Invalid pawn push")
 
                 if p_pawns & (1<<frm) == 0L:
                     raise InvalidMove("Pawn not able to push")
@@ -136,7 +141,7 @@ class Board(Serializer):
                         (delta > 0 and self.player == BLACK):
                     raise InvalidMove("Pawns cannot push backwards")
 
-            else:  # check for pawn attacks
+            elif delta % 7 == 0 or delta % 9 == 0:  # check for pawn attacks
                 enemy = self.positions[OFFSET + (self.player ^ 1)]
 
                 # treat en passant square as an enemy piece
@@ -147,6 +152,8 @@ class Board(Serializer):
 
                 if targets & (1<<to) == 0L:
                     raise InvalidMove("Pawn unable to attack")
+            else:
+                raise InvalidMove("Invalid pawn move")
 
         else:
             # validate castling
