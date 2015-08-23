@@ -77,4 +77,4 @@ for i in xrange(8):
         east = (occ - (2 * sq))                                 # fill east until first block (inclusive)
         west = mirror(mirror(occ) - (2 * mirror(sq)))           # fill west until first block (inclusive)
 
-        ATTACKS[i][j] = ((east ^ west) & 0xFF) * A1H1           # smear 1st rank occupancy across all ranks
+        ATTACKS[i][j] = ((east ^ west) & A1H1) * A1H1           # smear 1st rank occupancy across all ranks
