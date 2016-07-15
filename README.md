@@ -1,4 +1,4 @@
-A simple chess program.
+Play chess on the command-line. Board represented internally using bitboards.
 
 ### Usage
 
@@ -25,16 +25,17 @@ A simple chess program.
 
 Chessval has a suite of perft tests, to test 120+ different positions to {1,2,3,4,5,6} ply.
 
-	$ python test <ply>
-
-A word of warning: running tests to 6-ply takes about 8 hours on a machine with a Core i5 and 8gb of RAM.
+	$ pypy test <ply>
 
 To see output of divide / perft pass `quiet=False` to the debugger in `test/__main__.py`.
 
 ### Licence
 
-MIT Licence
+Copyright (c) 2014 Martin Ogden
 
-### Authors
 
-Martin Ogden
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
